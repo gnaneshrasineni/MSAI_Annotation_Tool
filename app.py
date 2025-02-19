@@ -18,11 +18,11 @@ display_height = 600
 H = 256
 W = 256
 
-test_example_dir = pathlib.Path("./new/MSAI_Ann_Tool/images")
+test_example_dir = pathlib.Path("./images")
 test_examples = [str(test_example_dir / x) for x in sorted(os.listdir(test_example_dir))]
 
 default_example = test_examples[7]
-exp_dir = pathlib.Path('./new/MSAI_Ann_Tool/checkpoints')
+exp_dir = pathlib.Path('./checkpoints')
 default_model = 'ScribblePrompt'
 
 model_dict = {
