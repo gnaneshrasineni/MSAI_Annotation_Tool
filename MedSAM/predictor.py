@@ -34,7 +34,7 @@ class Predictor:
                             model_type=self.model_type,
                             device=self.device)
 
-    def medsam_inference(self, img_embed, box_1024, H, W):
+    def medsam_inference(self, img_embed, points, box_1024, H, W):
         box_torch = torch.as_tensor(box_1024,
                                    dtype=torch.float,
                                    device=img_embed.device)
@@ -42,7 +42,7 @@ class Predictor:
             box_torch = box_torch[:, None,:]  # (B, 1, 4)
 
         sparse_embeddings, dense_embeddings = self.model.sam.prompt_encoder(
-            points=None,
+            points=points,
             boxes=box_torch,
             masks=None,
         )
@@ -59,7 +59,7 @@ class Predictor:
                                      size=(H, W),
                                      mode="bilinear",
                                      align_corners=False)  # (1, 1, gt.shape)
-        low_res_pred = low_res_pred.detach().numpy()  # (256, 256)
+        low_res_pred = low_res_pred.detach().cpu().numpy()  # (256, 256)
         medsam_seg = (low_res_pred > 0.5).astype(np.uint8)
         return medsam_seg
 
@@ -117,12 +117,13 @@ class Predictor:
                 img_1024_tensor)  # (B, 256, 64, 64)
 
         # --- Changes end here ---
-
+        points_SAM = None
         if prompts.get('point_coords') is not None:
-            points = prompts.get('point_coords').squeeze().cpu().numpy()
-            labels = prompts.get('point_labels').squeeze().cpu().numpy()
-            prompts['point_coords'] = points
-            prompts['point_labels'] = labels
+            points_SAM = (prompts.get('point_coords'), prompts.get('point_labels'))
+            points_np = prompts.get('point_coords').squeeze().cpu().numpy()
+            labels_np = prompts.get('point_labels').squeeze().cpu().numpy()
+            prompts['point_coords'] = points_np
+            prompts['point_labels'] = labels_np
 
         box_prompt = prompts.get('box')
         if box_prompt is not None:
@@ -131,7 +132,7 @@ class Predictor:
             H, W = original_shape
             box_1024 = box_prompt / np.array([W, H, W, H]) * 1024
             box_1024 = box_1024.reshape(1, 4)
-            medsam_mask = self.medsam_inference(img_features, box_1024,
+            medsam_mask = self.medsam_inference(img_features, points_SAM, box_1024,
                                                original_shape[0],
                                                original_shape[1])
         else:

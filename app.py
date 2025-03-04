@@ -14,25 +14,26 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 from ScribblePrompt.predictor import Predictor as ScribblePrompt_Predictor
 from MedSAM.predictor import Predictor as MedSAM_Predictor
 
-display_height = 600
+display_height = 800
+display_width = 1400
 H = 256
 W = 256
 
-test_example_dir = pathlib.Path("./images")
+test_example_dir = pathlib.Path("../MSAI_Annotation_Tool/images")
 test_examples = [str(test_example_dir / x) for x in sorted(os.listdir(test_example_dir))]
 
 default_example = test_examples[7]
-exp_dir = pathlib.Path('./checkpoints')
+exp_dir = pathlib.Path('../MSAI_Annotation_Tool/checkpoints')
 default_model = 'ScribblePrompt'
 
 model_dict = {
     'ScribblePrompt': 'ScribblePrompt_unet_v1_nf192_res128.pt',
     'MedSAM': 'medsam_vit_b.pth',
-    #'MedSAM-Lite': 'lite_medsam.pth',
-    'SAM': 'sam_vit_b_01ec64.pth'
+    'SAM': 'sam_vit_b_01ec64.pth',
+    'microSAM' : 'microsam_lm_vit_b.pt'
 }
 
-model_choices=['ScribblePrompt', 'MedSAM', 'SAM']
+model_choices=['ScribblePrompt', 'MedSAM', 'SAM', 'microSAM']
 
 
 # -----------------------------------------------------------------------------
@@ -192,7 +193,10 @@ def get_predictions(predictor, input_img, click_coords, click_labels, bbox_coord
     if seperate_scribble_masks is not None:
         scribble = torch.from_numpy(seperate_scribble_masks)[None,...].to(device)
     else:
-        scribble = None  
+        scribble = None
+        
+    if isinstance(low_res_mask, np.ndarray):
+        low_res_mask = torch.from_numpy(low_res_mask) 
     
     prompts = dict(
         img=torch.from_numpy(input_img)[None,None,...].to(device)/255, 
@@ -232,11 +236,13 @@ def refresh_predictions(predictor, input_img, output_img, click_coords, click_la
     )
 
     # Update input visualizations using original color image for display
-    if not isinstance(best_mask, np.ndarray):
-        mask_to_viz = best_mask.numpy()
-    else:
-        best_mask = best_mask.squeeze().squeeze()
-        mask_to_viz = best_mask
+    mask_to_viz = None
+    if best_mask is not None :
+        if not isinstance(best_mask, np.ndarray):
+            mask_to_viz = best_mask.numpy()
+        else:
+            best_mask = best_mask.squeeze().squeeze()
+            mask_to_viz = best_mask
 
     click_input_viz = viz_pred_mask(input_img_viz, mask_to_viz, click_coords, click_labels, 
                                   bbox_coords, seperate_scribble_masks, binary_checkbox)
@@ -453,7 +459,8 @@ with gr.Blocks(theme=gr.themes.Default(text_size=gr.themes.sizes.text_lg)) as de
                         sources=(),
                         container=True,
                         show_download_button=True,
-                        height=display_height
+                        height=display_height,
+                        width=display_width
                     )
 
                 with gr.Tab("Clicks/Boxes") as click_tab:
